@@ -10,6 +10,18 @@ export const getQuestion = async (req, res) => {
     const order = parseInt(req.query.order, 10);
 
     try {
+        const question = await Question.findOne({
+            level: level,
+            order: order,
+        }).select("-_id title description imageUrl level order").exec();
+
+        if (!question) {
+            return res.status(404).json({
+                success: false,
+                message: "Question requested doesn't exist",
+            });
+        }
+
         let response = await QuestionResponse.findOne({
             level: level,
             order: order,
@@ -39,18 +51,6 @@ export const getQuestion = async (req, res) => {
                 opened: 1,
             });
             await response.save();
-        }
-
-        const question = await Question.findOne({
-            level: level,
-            order: order,
-        }).select("-_id title description imageUrl level order").exec();
-
-        if (!question) {
-            return res.status(400).json({
-                success: false,
-                message: "Question requested doesn't exist",
-            });
         }
 
         return res.status(200).json({

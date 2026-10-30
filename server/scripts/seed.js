@@ -7,70 +7,51 @@ import logger from "../utils/logger.js";
 
 async function seed() {
     try {
-        logger.info("Connecting to database for seeding: " + config.dbUrl);
-        await mongoose.connect(config.dbUrl);
+        const dbUrl = process.env.MONGODB_URL || config.dbUrl;
+        logger.info("Connecting to database for seeding: " + dbUrl);
+        await mongoose.connect(dbUrl);
         logger.info("Connected to MongoDB.");
 
-        logger.info("Clearing existing questions and users...");
-        await User.deleteMany({});
+        logger.info("Refreshing questions bank and question responses...");
         await Question.deleteMany({});
         await QuestionResponse.deleteMany({});
 
-        // 1. Create Admin
+        // Reset points for any existing participants so they have plenty of points to test
+        await Participant.updateMany({}, { $set: { points: 50 } });
+        logger.info("Existing participants points reset to 50.");
+
+        // 1. Create or Update Admin
         const hashedPassword = await hashPassword("password123");
+        await Admin.findOneAndUpdate(
+            { email: "admin@njath.com" },
+            {
+                username: "admin",
+                email: "admin@njath.com",
+                password: hashedPassword,
+                role: USER_ROLE.ADMIN,
+                phone: "9999999999",
+                fullname: "System Administrator",
+            },
+            { upsert: true, new: true }
+        );
+        logger.info("✅ Admin ready: admin@njath.com / password123");
 
-        const admin = new Admin({
-            username: "admin",
-            email: "admin@njath.com",
-            password: hashedPassword,
-            role: USER_ROLE.ADMIN,
-            phone: "9999999999",
-            fullname: "System Administrator",
-        });
-        await admin.save();
-        logger.info("✅ Admin created: admin@njath.com / password123");
+        // 2. Create or Update Organizer
+        await Organizer.findOneAndUpdate(
+            { email: "organizer@njath.com" },
+            {
+                username: "organizer",
+                email: "organizer@njath.com",
+                password: hashedPassword,
+                role: USER_ROLE.ORGANIZER,
+                phone: "8888888888",
+                fullname: "NJATH Organizer",
+            },
+            { upsert: true, new: true }
+        );
+        logger.info("✅ Organizer ready: organizer@njath.com / password123");
 
-        // 2. Create Organizer
-        const organizer = new Organizer({
-            username: "organizer",
-            email: "organizer@njath.com",
-            password: hashedPassword,
-            role: USER_ROLE.ORGANIZER,
-            phone: "8888888888",
-            fullname: "NJATH Organizer",
-        });
-        await organizer.save();
-        logger.info("✅ Organizer created: organizer@njath.com / password123");
-
-        // 3. Create Sample Participants
-        const participant1 = new Participant({
-            username: "treasurehunter",
-            email: "player1@njath.com",
-            password: hashedPassword,
-            role: USER_ROLE.PARTICIPANT,
-            phone: "1234567890",
-            fullname: "Alice Hunter",
-            points: 50,
-            remainingLoan: 2,
-            correctAnswers: InitialiseEmptyMatrix(),
-        });
-        await participant1.save();
-
-        const participant2 = new Participant({
-            username: "cryptic_solver",
-            email: "player2@njath.com",
-            password: hashedPassword,
-            role: USER_ROLE.PARTICIPANT,
-            phone: "9876543210",
-            fullname: "Bob Cryptic",
-            points: 40,
-            remainingLoan: 2,
-            correctAnswers: InitialiseEmptyMatrix(),
-        });
-        await participant2.save();
-        logger.info("✅ Sample participants created (player1@njath.com, player2@njath.com / password123)");
-
-        // 4. Seed Questions across 6 Levels (8 questions per level)
+        // 3. Seed Questions across 6 Levels (8 questions per level)
         const sampleQuestions = [
             // Level 1: Beginner Enigmas
             {
@@ -221,7 +202,7 @@ async function seed() {
             },
         ];
 
-        // Fill remaining levels (3, 4, 5, 6) with procedural template questions if not explicitly listed
+        // Fill remaining levels (3, 4, 5, 6) with procedural mystery questions
         for (let lvl = 3; lvl <= config.maxLevels; lvl++) {
             for (let ord = 1; ord <= config.maxQuestioninLevel; ord++) {
                 sampleQuestions.push({
@@ -236,7 +217,7 @@ async function seed() {
             }
         }
 
-        // Insert into Question collection
+        // Insert all questions into the collection
         await Question.insertMany(sampleQuestions);
         logger.info(`✅ Successfully seeded ${sampleQuestions.length} questions across ${config.maxLevels} levels!`);
 
@@ -249,4 +230,3 @@ async function seed() {
 }
 
 seed();
-
