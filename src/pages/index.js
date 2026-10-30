@@ -103,7 +103,7 @@ export default function Landing() {
                         <p className="font-bold">Direct Links:</p>
                         <br />
                         <Link
-                            href="https://drive.google.com/file/d/1zN0tMul6S6pUM0fHFYZrnDqNW_usyIJo/view?usp=sharing"
+                            href="https://docs.google.com/document/d/1_ewH-kznhYYGO9RwMfWvrpjsi06PVsyk/edit"
                             className="text-sm"
                         >
                             NJATH Rulebook
