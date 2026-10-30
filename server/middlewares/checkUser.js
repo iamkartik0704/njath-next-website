@@ -4,7 +4,19 @@ import logger from "../utils/logger.js";
 
 export const checkUser = (userRole) => {
     return async (req, res, next) => {
-        const token = req.cookies.access_token;
+        let token = req.cookies.access_token;
+
+        if (!token && req.headers.authorization) {
+            if (req.headers.authorization.startsWith("Bearer ")) {
+                token = req.headers.authorization.slice(7).trim();
+            } else {
+                token = req.headers.authorization.trim();
+            }
+        }
+
+        if (!token && req.query.token) {
+            token = req.query.token;
+        }
 
         if (!token) {
             return res.status(401).json({

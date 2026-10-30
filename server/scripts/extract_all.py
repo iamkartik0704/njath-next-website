@@ -66,3 +66,4 @@ with open("parsed_final.json", "w", encoding="utf-8") as f:
     json.dump(items2, f, indent=2)
 
 print("Saved JSON structures.")
+

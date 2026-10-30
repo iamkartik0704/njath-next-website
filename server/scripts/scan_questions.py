@@ -20,3 +20,4 @@ for i, item in enumerate(items2):
     imgs = item.get('images', [])
     if any(k in t.lower() for k in ['level', 'answer', 'ans', 'hint', 'ques']):
         print(f"[{i}] {t[:80]} | Imgs: {imgs}")
+

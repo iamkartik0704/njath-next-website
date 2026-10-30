@@ -18,3 +18,4 @@ for i, item in enumerate(fin):
     if item['images']:
         txt = " | ".join([fin[j]['text'] for j in range(max(0, i-2), min(len(fin), i+3)) if fin[j]['text']])
         print(f"Item {i} Imgs: {item['images']} -> Context: {txt[:100]}")
+

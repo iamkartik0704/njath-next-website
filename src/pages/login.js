@@ -40,6 +40,9 @@ export default function Login() {
             if (response.data.success === false) {
                 toast.error(response.data.message);
             } else {
+                if (response.data.token) {
+                    localStorage.setItem("token", response.data.token);
+                }
                 toast.success(response.data.message);
                 setIsLoggedIn(true);
                 router.push("/levels");

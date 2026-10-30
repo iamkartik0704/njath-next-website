@@ -6,6 +6,19 @@ import Loading from "@/components/Loading/Loading";
 
 const AuthContext = createContext();
 
+// Global Axios Interceptor to always attach Authorization Bearer token from localStorage
+if (typeof window !== "undefined") {
+    axios.interceptors.request.use((config) => {
+        const token = localStorage.getItem("token");
+        if (token) {
+            config.headers = config.headers || {};
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        config.withCredentials = true;
+        return config;
+    });
+}
+
 // Array of public routes that don't require authentication
 const PUBLIC_ROUTES = ["/login", "/register", "/", "/about"];
 
@@ -29,6 +42,19 @@ export const AuthProvider = ({ children }) => {
     };
 
     useEffect(() => {
+        // Capture token if present in URL (e.g. from Google OAuth callback)
+        if (typeof window !== "undefined") {
+            const urlParams = new URLSearchParams(window.location.search);
+            const tokenFromUrl = urlParams.get("token");
+            if (tokenFromUrl) {
+                localStorage.setItem("token", tokenFromUrl);
+                urlParams.delete("token");
+                const newSearch = urlParams.toString();
+                const cleanUrl = window.location.pathname + (newSearch ? `?${newSearch}` : "");
+                window.history.replaceState({}, document.title, cleanUrl);
+            }
+        }
+
         const checkAuthAndFetchUser = async () => {
             const loginApiUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/login`;
             const participantDataApi = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/participant/`;
@@ -64,6 +90,9 @@ export const AuthProvider = ({ children }) => {
             setUser(null);
 
             if (axios.isAxiosError(error) && error.response?.status === 401) {
+                if (typeof window !== "undefined") {
+                    localStorage.removeItem("token");
+                }
                 // Only redirect to login if we're on a protected route
                 const currentPath = router.pathname;
                 if (!isPublicRoute(currentPath)) {

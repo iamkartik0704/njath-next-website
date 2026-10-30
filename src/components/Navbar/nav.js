@@ -70,6 +70,9 @@ const Nav = () => {
 
             if (response.status === 200 && response.data.success) {
                 console.log("entered");
+                if (typeof window !== "undefined") {
+                    localStorage.removeItem("token");
+                }
                 setIsLoggedIn(false);
                 setUser(null);
                 setToggleDropDown(false);

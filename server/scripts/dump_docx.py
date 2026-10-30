@@ -15,3 +15,4 @@ def dump_docx(docx_path, out_txt):
 dump_docx("NJATH 2023 Questions Round 0&1.docx", "dump_round0_1.txt")
 dump_docx("NJATH Final Questions.docx", "dump_final.txt")
 print("Dumped text successfully.")
+

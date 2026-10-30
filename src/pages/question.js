@@ -55,8 +55,10 @@ const Question = () => {
             toast.error("Invalid Link");
         }
 
+        const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
         const config = {
             credentials: "include",
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
         };
         const ApiEndpoint = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/participant/question?level=${Number(level)}&order=${Number(order)}`;
 

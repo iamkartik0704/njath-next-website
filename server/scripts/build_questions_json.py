@@ -451,3 +451,4 @@ with open("server/scripts/extracted_questions.json", "w", encoding="utf-8") as f
     json.dump(extracted_questions, f, indent=2)
 
 print(f"Generated {len(extracted_questions)} questions from Word documents.")
+

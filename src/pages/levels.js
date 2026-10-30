@@ -18,6 +18,14 @@ const Levels = () => {
     const participantDataApi = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/participant/`;
 
     useEffect(() => {
+        if (typeof window !== "undefined") {
+            const urlParams = new URLSearchParams(window.location.search);
+            const tokenFromUrl = urlParams.get("token");
+            if (tokenFromUrl) {
+                localStorage.setItem("token", tokenFromUrl);
+            }
+        }
+
         // Only fetch if we're not already loading auth state
         if (!isLoading) {
             const fetchData = async () => {

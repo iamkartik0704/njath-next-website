@@ -104,6 +104,7 @@ export const login = async (req, res) => {
 		return res.status(200).json({
 			success: true,
 			message: "Login successful",
+			token: accessToken,
 			data: {
 				username: user.username,
 				email: user.email,
@@ -384,8 +385,8 @@ export const googleAuthCallback = async (req, res) => {
 
 		res.cookie("access_token", accessToken, cookieOptions);
 
-		// 5. Redirect back to frontend
-		return res.redirect(`${config.frontendUrl}/levels`);
+		// 5. Redirect back to frontend with token param (for cross-domain Safari/Chrome cookie fallback)
+		return res.redirect(`${config.frontendUrl}/levels?token=${encodeURIComponent(accessToken)}`);
 	} catch (err) {
 		logger.error(err, "Google OAuth callback error");
 		return res.redirect(`${config.frontendUrl}/login?error=Google+authentication+failed`);
