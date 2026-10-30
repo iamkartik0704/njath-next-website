@@ -83,6 +83,9 @@ const participantSchema = new mongoose.Schema({
 	},
 });
 
+// Index for high-concurrency leaderboard sorting
+participantSchema.index({ points: -1 });
+
 const adminSchema = new mongoose.Schema({
 	adminCommonField: String,
 });

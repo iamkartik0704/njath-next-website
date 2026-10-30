@@ -409,25 +409,36 @@ export const getParticipantData = async (req, res) => {
     }
 };
 
+// High-concurrency in-memory cache for leaderboard (5-second TTL)
+let cachedParticipants = null;
+let lastLeaderboardFetchTime = 0;
+const LEADERBOARD_CACHE_TTL = 5000; // 5 seconds
+
 export const getLeaderBoard = async (req, res) => {
     try {
         const participantUsername = req.user.username;
-        let participants = await Participant.find({})
-            .select("-_id -__t username points")
-            .sort({ points: -1 })
-            .limit(500)
-            .exec();
+        const now = Date.now();
+
+        if (!cachedParticipants || now - lastLeaderboardFetchTime > LEADERBOARD_CACHE_TTL) {
+            cachedParticipants = await Participant.find({})
+                .select("-_id -__t username points")
+                .sort({ points: -1 })
+                .limit(500)
+                .lean()
+                .exec();
+            lastLeaderboardFetchTime = now;
+        }
 
         let rank =
-            participants.findIndex((p) => p.username === participantUsername) + 1;
+            cachedParticipants.findIndex((p) => p.username === participantUsername) + 1;
 
         if (rank === 0) {
-            rank = participants.length + 1;
+            rank = cachedParticipants.length + 1;
         }
 
         return res.status(200).json({
             success: true,
-            data: participants,
+            data: cachedParticipants,
             myRank: rank,
         });
     } catch (error) {
