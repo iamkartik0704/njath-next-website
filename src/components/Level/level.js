@@ -8,6 +8,7 @@ import { useRouter } from "next/router";
 import QuestionList from "@components/QuestionList/QuestionList";
 import Loading from "@components/Loading/Loading";
 import Image from "next/image";
+import axios from "axios";
 
 const Level = ({ unlocked, level }) => {
     const [isAccordionOpen, setIsAccordionOpen] = useState(false);
@@ -18,39 +19,40 @@ const Level = ({ unlocked, level }) => {
     const solved = 1;
     const tempcolor = unlocked ? "rgba(253, 204, 6, 1)" : "#FFFFFF8C";
     const customStyles = {
-        // '--background-color': '#111A23',
         "--font-color": tempcolor,
         "--disabled-opacity": !unlocked || solved ? 0.5 : 1,
-        // "--border":
     };
 
     const [data, setData] = useState(null);
-    const levelDetailApi = `${process.env.NEXT_PUBLIC_BACKEND_URL
-        }/api/participant/get-level-details?level=${level + 1}`;
+    const [loadingQuestions, setLoadingQuestions] = useState(false);
+    const levelDetailApi = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/participant/get-level-details?level=${level + 1}`;
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const response = await fetch(levelDetailApi, { credentials: "include" });
-                const data = await response.json();
-                if (response.status === 200) {
-                    setData(data.data);
-                } else if (response.status === 401) {
-                    console.log(response.data.message);
-                    router.push("/login");
-                } else {
-                    console.error(`Failed to fetch data. Status: ${response.status}`);
-                    toast.error(response.data.message);
-                }
-            } catch (error) {
-                console.error(error);
+    const fetchLevelData = async () => {
+        if (loadingQuestions || data) return;
+        setLoadingQuestions(true);
+        try {
+            const response = await axios.get(levelDetailApi, { withCredentials: true });
+            if (response.status === 200 && response.data?.success) {
+                setData(response.data.data);
+            } else if (response.status === 401) {
+                router.push("/login");
             }
-        };
-
-        if (unlocked === 1 && isAccordionOpen) {
-            fetchData();
+        } catch (error) {
+            console.error("Failed to fetch level details:", error);
+            if (error.response?.status === 401) {
+                router.push("/login");
+            }
+        } finally {
+            setLoadingQuestions(false);
         }
-    }, [isAccordionOpen, levelDetailApi, unlocked]);
+    };
+
+    // Pre-fetch Level 1 immediately if unlocked; fetch others when accordion is clicked
+    useEffect(() => {
+        if (unlocked === 1 && (isAccordionOpen || level === 0)) {
+            fetchLevelData();
+        }
+    }, [isAccordionOpen, unlocked, level]);
 
     return (
         <div style={customStyles} className="font-montserrat">
@@ -58,42 +60,44 @@ const Level = ({ unlocked, level }) => {
                 disabled={!unlocked}
                 onChange={handleAccordionChange}
                 sx={{
-                    backgroundColor: "#00000000",
-                    borderColor: "#FDCC0699",
-                    border: 0,
-                    borderWidth: "0.25rem",
+                    "&.MuiPaper-root": {
+                        backgroundColor: "#111A23",
+                        border: "2px solid #FFFFFF8C",
+                        borderRadius: "8px",
+                        margin: "12px 0",
+                    },
                 }}
             >
-                <AccordionSummary>
-                    <div className="py-0 flex-between w-full self-start">
-                        <Typography
-                            style={{
-                                color: "var(--font-color)",
-                                fontFamily: "Montserrat",
-                                fontWeight: "bold",
-                                fontSize: "0.85em",
-                                letterSpacing: "1px",
-                            }}
-                        >
-                            Level {level + 1}
-                        </Typography>
-
-                        {unlocked ? null : (
-                            <Image
-                                src="/assets/Locked-Dimmed.svg"
-                                alt="Check Icon"
-                                width={28}
-                                height={28}
-                            />
-                        )}
-                    </div>
+                <AccordionSummary
+                    expandIcon={
+                        <Image
+                            src="/assets/icons/arrow_down.svg"
+                            alt="expand"
+                            width={20}
+                            height={20}
+                        />
+                    }
+                    aria-controls={`panel${level}-content`}
+                    id={`panel${level}-header`}
+                >
+                    <Typography
+                        sx={{
+                            fontFamily: "Montserrat",
+                            fontWeight: "bold",
+                            color: tempcolor,
+                            fontSize: "1.1rem",
+                        }}
+                    >
+                        Level {level + 1}
+                    </Typography>
                 </AccordionSummary>
-
                 <AccordionDetails>
                     {data ? (
                         <QuestionList question={data.question} level={level + 1} />
                     ) : (
-                        <Loading />
+                        <div className="py-4 flex justify-center">
+                            <Loading />
+                        </div>
                     )}
                 </AccordionDetails>
             </Accordion>

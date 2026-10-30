@@ -1,90 +1,95 @@
-import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/router';
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/router";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import QuestionBox from "@components/QuestionBox/QuestionBox";
-import Head from 'next/head';
-
-function getQueryParameters(url) {
-    const queryParameters = new URL(url, `${process.env.NEXT_PUBLIC_FRONTEND_URL}`).searchParams;
-    const level = parseInt(queryParameters.get("level"), 10);
-    const order = parseInt(queryParameters.get("order"), 10);
-
-    console.log("URL:", url); // Check the URL being passed to the function
-    console.log("Extracted level:", level);
-    console.log("Extracted order:", order);
-
-    return { level, order };
-}
+import Loading from "@components/Loading/Loading";
+import Head from "next/head";
+import axios from "axios";
 
 const Question = () => {
     const router = useRouter();
-
     const [questionData, setQuestionData] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
 
-    const getQuestionData = async (ApiEndpoint, config) => {
-        try {
-            const response = await fetch(ApiEndpoint, config);
-            const data = await response.json();
-            console.log(data);
-            if (response.ok) {
-                setQuestionData(data.data);
-            } else if (response.status === 400) {
-                if (data.message) {
-                    toast.error(data.message);
-                    router.push("/levels")
-                }
-                else {
-                    toast.error("Unknown error occured");
-                    router.push("/levels")
-                }
-            } else {
-                console.error(`Failed to fetch data. Status: ${response.status}`);
-                router.push("/levels")
-            }
-        } catch (error) {
-            toast.error("Something Broke! Please Refresh");
-            router.push("/levels")
+    const getParam = (paramName) => {
+        if (typeof window !== "undefined") {
+            const urlParams = new URLSearchParams(window.location.search);
+            const val = urlParams.get(paramName);
+            if (val) return parseInt(val, 10);
         }
+        if (router.query && router.query[paramName]) {
+            return parseInt(router.query[paramName], 10);
+        }
+        return null;
     };
 
-    const getData = async () => {
-        const { level, order } = getQueryParameters(router.asPath);
+    useEffect(() => {
+        const level = getParam("level");
+        const order = getParam("order");
 
-        if (!level || !order) {
-            toast.error("Invalid Link");
+        if (!level || !order || isNaN(level) || isNaN(order)) {
+            // Wait until router is ready if query is not available yet
+            if (!router.isReady) return;
+            toast.error("Invalid question URL");
+            router.push("/levels");
+            return;
         }
 
-        const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-        const config = {
-            credentials: "include",
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
+        let isMounted = true;
+        const fetchQuestion = async () => {
+            setIsLoading(true);
+            try {
+                const response = await axios.get(
+                    `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/participant/question`,
+                    {
+                        params: { level, order },
+                        withCredentials: true,
+                    }
+                );
+
+                if (isMounted && response.data?.success) {
+                    setQuestionData(response.data.data);
+                } else {
+                    toast.error(response.data?.message || "Failed to load question");
+                    router.push("/levels");
+                }
+            } catch (error) {
+                console.error("Question fetch error:", error);
+                const msg = error.response?.data?.message || "Error loading question";
+                toast.error(msg);
+                if (error.response?.status === 401) {
+                    router.push("/login");
+                } else {
+                    router.push("/levels");
+                }
+            } finally {
+                if (isMounted) setIsLoading(false);
+            }
         };
-        const ApiEndpoint = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/participant/question?level=${Number(level)}&order=${Number(order)}`;
 
-        await getQuestionData(ApiEndpoint, config);
-    }
+        fetchQuestion();
 
-    useEffect(() => {
-        const fetchData = async () => {
-            const res = await getData();
-            console.log(res);
+        return () => {
+            isMounted = false;
         };
-
-        fetchData();
-    }, []);
-
-    const [open, setOpen] = useState(false);
-    const handleOpen = () => setOpen(true);
-    const handleClose = () => setOpen(false);
+    }, [router.isReady, router.asPath]);
 
     return (
         <>
-        <Head>
-        <title>{!questionData? "Loading Question" : `L0${questionData.level} Q0${questionData.order}`}</title>
-      </Head>
+            <Head>
+                <title>
+                    {!questionData
+                        ? "Loading Question - NJATH"
+                        : `L0${questionData.level} Q0${questionData.order} - NJATH`}
+                </title>
+            </Head>
             <ToastContainer autoClose={2000} />
-            {questionData !== null ? (
+            {isLoading || !questionData ? (
+                <div className="flex h-screen w-screen items-center justify-center">
+                    <Loading />
+                </div>
+            ) : (
                 <QuestionBox
                     imageUrl={questionData.imageUrl}
                     title={questionData.title}
@@ -92,8 +97,7 @@ const Question = () => {
                     level={questionData.level}
                     order={questionData.order}
                 />
-            ) : (<div> Loading ...</div>)
-            }
+            )}
         </>
     );
 };

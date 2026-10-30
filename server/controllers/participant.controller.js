@@ -4,16 +4,23 @@ import config from "../config/default.mjs";
 import { getClearedLevel } from "../utils/participant.util.js";
 import logger from "../utils/logger.js";
 
+// High-speed in-memory cache for the 48 static questions
+let questionsCache = null;
+const getCachedQuestions = async () => {
+    if (!questionsCache || questionsCache.length === 0) {
+        questionsCache = await Question.find({}).lean().exec();
+    }
+    return questionsCache;
+};
+
 export const getQuestion = async (req, res) => {
     const user = req.user;
     const level = parseInt(req.query.level, 10);
     const order = parseInt(req.query.order, 10);
 
     try {
-        const question = await Question.findOne({
-            level: level,
-            order: order,
-        }).select("-_id title description imageUrl level order").exec();
+        const allQuestions = await getCachedQuestions();
+        const question = allQuestions.find((q) => q.level === level && q.order === order);
 
         if (!question) {
             return res.status(404).json({
@@ -29,33 +36,49 @@ export const getQuestion = async (req, res) => {
         }).exec();
 
         if (response) {
-            response.opened += 1;
-            await response.save();
-        } else {
-            const currUser = await Participant.findOne({ _id: user._id }).exec();
-
-            if (!currUser || currUser.points < config.questionOpenPenelty) {
-                return res.status(400).json({
-                    success: false,
-                    message: "You don't have enough points to unlock this question",
-                });
-            }
-
-            currUser.points -= config.questionOpenPenelty;
-            await currUser.save();
-
-            response = new QuestionResponse({
-                level: level,
-                order: order,
-                participant: user._id,
-                opened: 1,
+            // Asynchronously increment open count without delaying response
+            QuestionResponse.updateOne({ _id: response._id }, { $inc: { opened: 1 } }).exec().catch(() => {});
+            return res.status(200).json({
+                success: true,
+                data: {
+                    title: question.title,
+                    description: question.description,
+                    imageUrl: question.imageUrl,
+                    level: question.level,
+                    order: question.order,
+                },
             });
-            await response.save();
         }
+
+        const currUser = await Participant.findOne({ _id: user._id }).exec();
+
+        if (!currUser || currUser.points < config.questionOpenPenelty) {
+            return res.status(400).json({
+                success: false,
+                message: "You don't have enough points to unlock this question",
+            });
+        }
+
+        currUser.points -= config.questionOpenPenelty;
+        await currUser.save();
+
+        response = new QuestionResponse({
+            level: level,
+            order: order,
+            participant: user._id,
+            opened: 1,
+        });
+        await response.save();
 
         return res.status(200).json({
             success: true,
-            data: question,
+            data: {
+                title: question.title,
+                description: question.description,
+                imageUrl: question.imageUrl,
+                level: question.level,
+                order: question.order,
+            },
         });
     } catch (e) {
         logger.error(e);
@@ -81,10 +104,8 @@ export const answerQuestion = async (req, res) => {
             });
         }
 
-        const question = await Question.findOne({
-            level: level,
-            order: order,
-        }).exec();
+        const allQuestions = await getCachedQuestions();
+        const question = allQuestions.find((q) => q.level === level && q.order === order);
 
         if (!question) {
             return res.status(400).json({
@@ -249,7 +270,7 @@ export const getLevelDetails = async (req, res) => {
         const questionResponses = await QuestionResponse.find({
             level: level,
             participant: user._id,
-        }).select("-_id order isCorrect hintTaken").exec();
+        }).select("-_id order isCorrect hintTaken").lean().exec();
 
         const questions = [];
         for (let i = 0; i < config.maxQuestioninLevel; i++) {
